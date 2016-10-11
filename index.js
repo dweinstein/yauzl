@@ -7,6 +7,8 @@ var EventEmitter = require("events").EventEmitter;
 var Transform = require("stream").Transform;
 var PassThrough = require("stream").PassThrough;
 var Writable = require("stream").Writable;
+var guess = require('./guess-encoding');
+var encodings = require('./guess-encoding').zipEncodings;
 
 exports.open = open;
 exports.fromFd = fromFd;
@@ -274,7 +276,9 @@ ZipFile.prototype.readEntry = function() {
       if (self.emittedError) return;
       // 46 - File name
       var isUtf8 = entry.generalPurposeBitFlag & 0x800
+      debugger;
       entry.fileName = bufferToString(buffer, 0, entry.fileNameLength, isUtf8);
+      debugger;
 
       // 46+n - Extra field
       var fileCommentStart = entry.fileNameLength + entry.extraFieldLength;
@@ -642,9 +646,15 @@ RefUnrefFilter.prototype.unref = function(cb) {
 
 var cp437 = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼ !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ';
 function bufferToString(buffer, start, end, isUtf8) {
-  if (isUtf8) {
-    return buffer.toString("utf8", start, end);
-  } else {
+  var guessEncoding = guess.zipGuessEncoding(
+    buffer.slice(start, end),
+    isUtf8 ? encodings.utf8known: encodings.utf8unknown
+  );
+  switch (guessEncoding) {
+    case encodings.utf8known:
+    case encodings.utf8guessed:
+      return buffer.toString("utf8", start, end);
+    default:
     var result = "";
     for (var i = start; i < end; i++) {
       result += cp437[buffer[i]];
